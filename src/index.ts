@@ -1,6 +1,7 @@
 import path from 'path';
 import urlJoin from 'url-join';
 import fs from 'fs-extra';
+import crypto from 'crypto';
 import glob from 'fast-glob';
 import PromiseQueue from 'p-queue';
 
@@ -150,6 +151,7 @@ async function executeBenchmark(opts: {
   };
   parcelPackages: Map<string, string>;
   parcelDir: string;
+  cleanUp: boolean;
   trace?: boolean;
   profile?: boolean;
 }): Promise<IBenchmark | null> {
@@ -178,7 +180,7 @@ async function executeBenchmark(opts: {
     throw err;
   }
 
-  if (!opts.trace && !opts.profile) {
+  if (opts.cleanUp) {
     await cleanupBenchmark(benchmark);
   }
 
@@ -228,6 +230,7 @@ async function start() {
     let baseBenchmarkResult = await executeBenchmark({
       benchmarkConfig,
       parcelDir: mainDir,
+      cleanUp: true,
       parcelPackages: mainParcelPackages,
     });
 
@@ -246,6 +249,7 @@ async function start() {
     let prBenchmarkResult = await executeBenchmark({
       benchmarkConfig,
       parcelDir: prDir,
+      cleanUp: true,
       parcelPackages: prParcelPackages,
     });
 
@@ -300,6 +304,7 @@ function runCommandLine() {
               const benchmarkResults = await executeBenchmark({
                 benchmarkConfig,
                 parcelDir: args.targetDir,
+                cleanUp: false,
                 parcelPackages: parcelPackages,
                 trace: args.trace,
                 profile: args.profile,
@@ -313,6 +318,9 @@ function runCommandLine() {
               console.log('cold build time:', result.result.cold.buildTime);
               for (let bundleMetrics of result.result.cold.bundles) {
                 console.log('  -->', bundleMetrics.filePath, bundleMetrics.time);
+                const contents = fs.readFileSync(bundleMetrics.filePath);
+                const hash = crypto.createHash('sha256').update(contents).digest('hex');
+                console.log('  -->', hash);
               }
 
               console.log('warm build time:', result.result.cached.buildTime);
